@@ -1,4 +1,4 @@
-# TP Web Scraping - Groupe [Votre Groupe]
+# TP Web Scraping
 
 ## 🎯 Objectif
 
