@@ -1,0 +1,6 @@
+beautifulsoup4==4.12.3
+requests==2.31.0
+selenium==4.21.0
+scrapy==2.11.1
+pandas==2.2.2
+lxml==5.2.1
