@@ -1,13 +1,32 @@
-# Define your item pipelines here
-#
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
+import csv
+import json
+import os
+import shutil
 
+class AnimeplanetScrapyPipeline:
+    def open_spider(self, spider):
+        # Suppression dossier data si déjà existant
+        if os.path.exists("data"):
+            shutil.rmtree("data")
+        os.makedirs("data", exist_ok=True)
 
-# useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
+        self.items = []
 
+        self.csv_file = open("data/animes.csv", "w", newline='', encoding='utf-8')
+        self.writer = csv.DictWriter(self.csv_file, fieldnames=["rang", "titre", "note", "episodes", "description"])
+        self.writer.writeheader()
 
-class ScrapyScraperPipeline:
     def process_item(self, item, spider):
+        item["titre"] = item.get("titre", "").strip()
+        item["description"] = item.get("description", "").strip()
+        item["episodes"] = item.get("episodes", "?").strip()
+
+        self.writer.writerow(item)
+        self.items.append(dict(item))
         return item
+
+    def close_spider(self, spider):
+        self.csv_file.close()
+
+        with open('data/animes.json', 'w', encoding='utf-8') as f_json:
+            json.dump(self.items, f_json, ensure_ascii=False, indent=4)
