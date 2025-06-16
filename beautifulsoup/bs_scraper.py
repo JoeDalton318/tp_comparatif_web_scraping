@@ -1,73 +1,48 @@
-# beautifulsoup/top_scraper_bs.py
-
-import os
-import time
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
+import csv
+import time
 
-os.makedirs("raw_data", exist_ok=True)
+# Démarrer le chrono
+start = time.time()
 
-start_time = time.time()
+# Liste pour stocker les données
+animes = []
 
-BASE_URLS = {
-    "top_anime": "https://www.anime-planet.com/anime/top-anime",
-    "top_manga": "https://www.anime-planet.com/manga/top-manga",
-    "top_characters": "https://www.anime-planet.com/characters/top-loved",
-    "season_winter_2025": "https://www.anime-planet.com/anime/seasons/winter-2025",
-    "season_spring_2025": "https://www.anime-planet.com/anime/seasons/spring-2025",
-    "season_fall_2024": "https://www.anime-planet.com/anime/seasons/fall-2024",
-}
+# Récupérer la page principale
+print("Scraping en cours...")
+url = "https://www.anime-planet.com/anime/top-anime"
+page = requests.get(url)
+soup = BeautifulSoup(page.text, 'html.parser')
 
+# Extraire les liens des animes
+links = [a['href'] for a in soup.select('td.tableTitle a')]
 
-def extract_titles_from_page(url, is_character=False):
-    r = requests.get(url)
-    soup = BeautifulSoup(r.content, "html.parser")
-
-    if is_character:
-        cards = soup.select("ul.cardDeck li.card")
-        return [
-            {
-                "title": card.select_one("h3").text.strip(),
-                "url": "https://www.anime-planet.com"
-                + card.select_one("a").get("href"),
-            }
-            for card in cards[:20]
-        ]
-
-    else:
-        cards = soup.select("ul.cardDeck li.card")
-        return [
-            {
-                "title": card.select_one("h3").text.strip(),
-                "url": "https://www.anime-planet.com"
-                + card.select_one("a").get("href"),
-                "type": card.select_one(".type")
-                and card.select_one(".type").text.strip(),
-                "nb_votes": card.select_one(".avgRating .tooltip")
-                and card.select_one(".tooltip").text.strip(),
-            }
-            for card in cards[:20]
-        ]
-
-
-all_data = []
-
-for label, url in BASE_URLS.items():
-    is_char = "characters" in url
-    data = extract_titles_from_page(url, is_character=is_char)
-    for d in data:
-        d["category"] = label
-        all_data.append(d)
+for link in links[:10]:  # Limité à 10 pour l'exemple
+    try:
+        # Récupérer chaque page anime
+        anime_page = requests.get(f"https://www.anime-planet.com{link}")
+        anime_soup = BeautifulSoup(anime_page.text, 'html.parser')
+        
+        # Extraire les données
+        data = {
+            'titre': anime_soup.find('h1').text.strip(),
+            'note': anime_soup.find('div', class_='avgRating').text.strip(),
+            'episodes': anime_soup.find('div', class_='pure-1 md-1-5').text.split('(')[1].split('eps')[0].strip(),
+            'description': anime_soup.find('div', class_='entrySynopsis').p.text.strip()
+        }
+        animes.append(data)
+        print(f"Scrapé: {data['titre']}")
+        
+        time.sleep(1)  # Pause entre les requêtes
+        
+    except Exception as e:
+        print(f"Erreur sur {link}: {e}")
 
 # Sauvegarde CSV
-df = pd.DataFrame(all_data)
-df.to_csv("beautifulsoup/top_20_bs.csv", index=False, encoding="utf-8-sig")
-print("Fichier CSV généré : top_20_bs.csv")
+with open('animes.csv', 'w', newline='', encoding='utf-8') as f:
+    writer = csv.DictWriter(f, fieldnames=['titre', 'note', 'episodes', 'description'])
+    writer.writeheader()
+    writer.writerows(animes)
 
-# Sauvegarde JSON
-df.to_json("raw_data/top_20_bs.json", orient="records", indent=2, force_ascii=False)
-
-# Timer
-end_time = time.time()
-print(f"Données sauvegardées dans raw_data/ - Temps d'exécution : {end_time - start_time:.2f} secondes")
+print(f"Terminé en {time.time()-start:.2f}s. {len(animes)} animes sauvegardés.")
